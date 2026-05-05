@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.DS_Store
+build/
+dist/
+data/IEA-15-240-RWT/

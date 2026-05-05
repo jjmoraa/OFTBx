@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OFTBx"
+version = "0.1.0"
+description = "OpenFAST Toolbox extension for envelope generation"
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["OFTBx"]
