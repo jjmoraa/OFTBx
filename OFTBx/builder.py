@@ -3,13 +3,6 @@ import shutil
 import warnings
 
 def build_model_from_fst(fst_path: str, model_name: str, models_dir="models"):
-    """
-    Minimal builder:
-    - takes an OpenFAST .fst file
-    - creates a model folder
-    - copies .fst into it as base definition
-    """
-
     fst_path = Path(fst_path).resolve()
 
     if not fst_path.exists():
@@ -17,19 +10,22 @@ def build_model_from_fst(fst_path: str, model_name: str, models_dir="models"):
 
     model_dir = Path(models_dir) / model_name
 
-    # clean build
     if model_dir.exists():
         shutil.rmtree(model_dir)
 
     model_dir.mkdir(parents=True)
 
-    copied_files = copy_dependency_tree(fst_path, model_dir)
+    # 1. collect all files
+    files = collect_dependency_tree(fst_path)
 
-    # copy main fst
-    shutil.copy2(fst_path, model_dir / "base.fst")
+    # 2. copy with structure
+    path_map = copy_with_structure(files, model_dir)
+
+    # 3. rewrite paths
+    rewrite_all_files(path_map)
 
     print(f"[BUILD] Model created at: {model_dir}")
-    print(f"[BUILD] Files copied: {len(copied_files)}")
+    print(f"[BUILD] Files copied: {len(files)}")
 
     return model_dir
 
@@ -62,15 +58,9 @@ def extract_file_references(file_path: Path):
 
     return refs
 
-def copy_dependency_tree(fst_path: Path, model_dir: Path):
-    """
-    Recursively copies all files referenced by fst and subfiles.
-    """
-
+def collect_dependency_tree(fst_path: Path):
     visited = set()
     stack = [fst_path]
-
-    base_dir = fst_path.parent
 
     while stack:
         current = stack.pop()
@@ -80,13 +70,6 @@ def copy_dependency_tree(fst_path: Path, model_dir: Path):
 
         visited.add(current)
 
-        # copy file
-        target_path = model_dir / current.name
-
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(current, target_path)
-
-        # find references inside file
         try:
             refs = extract_file_references(current)
         except Exception:
@@ -95,14 +78,85 @@ def copy_dependency_tree(fst_path: Path, model_dir: Path):
         for ref in refs:
             ref_path = (current.parent / ref).resolve()
 
-            for ref in refs:
-                ref_path = (current.parent / ref).resolve()
+            if not ref_path.exists():
+                warnings.warn(f"[MISSING] {ref_path} referenced in {current}")
+                continue
 
-                if not ref_path.exists():
-                    warnings.warn(f"[MISSING] {ref_path} referenced in {current}")
-                    continue
-
-                stack.append(ref_path)
+            stack.append(ref_path)
 
     return visited
+
+def classify_file(path: Path):
+    name = path.name.lower()
+    parent = path.parent.name.lower()
+
+    if name.endswith(".fst"):
+        return "" 
     
+    # --- Airfoils (better heuristic)
+    if parent == "airfoils":
+        return "aerodyn/airfoils"
+    
+    # --- AeroDyn main file
+    if "aerodyn" in name:
+        return "aerodyn"
+
+    #if any(x in name for x in ["du", "ffa", "naca"]):
+    #    return "aerodyn/airfoils"
+
+    # --- other modules
+    if "elastodyn" in name:
+        return "elastodyn"
+    if "beamdyn" in name:
+        return "beamdyn"
+    if "inflow" in name:
+        return "inflow"
+    if "servo" in name:
+        return "servodyn"
+    if "hydro" in name:
+        return "hydrodyn"
+    if "subdyn" in name:
+        return "subdyn"
+
+    return "misc"
+
+from os.path import relpath
+
+def copy_with_structure(files, model_dir):
+    path_map = {}
+
+    for f in files:
+        subfolder = classify_file(f)
+        target_path = model_dir / subfolder / f.name
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, target_path)
+
+        path_map[f.resolve()] = target_path.resolve()
+
+    return path_map
+
+def rewrite_all_files(path_map):
+    from os.path import relpath
+
+    for old, new in path_map.items():
+        try:
+            with open(new, "r") as f:
+                lines = f.readlines()
+        except Exception:
+            continue  # skip binary or unreadable files
+
+        new_lines = []
+
+        for line in lines:
+            updated = line
+
+            for old_path, new_path in path_map.items():
+                if old_path.name in updated:
+                    rel = relpath(new_path, start=new.parent)
+                    updated = updated.replace(old_path.name, rel)
+
+            new_lines.append(updated)
+
+        with open(new, "w") as f:
+            f.writelines(new_lines)
