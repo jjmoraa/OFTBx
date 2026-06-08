@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-cases_dir = Path("runs/inflow_sweep")
+cases_dir = Path("runs/inflow_sweep_dfl")
 case_dirs = sorted([
     d for d in cases_dir.iterdir()
     if d.is_dir() and (d / "case.fst").exists()

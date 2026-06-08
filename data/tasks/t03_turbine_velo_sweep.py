@@ -13,13 +13,13 @@ from OFTBx.turbine import Turbine
 # 2. Load turbine object
 # ------------------------------------------------------------
 turbine = Turbine(
-    name="IEA15MW",
-    model_path="models/IEA15MW"
+    name="IEA15MW_ref",
+    model_path="models/IEA15MW_reference"
 )
 
 # ----- create directories for openfast simulation
 turbine.inflow_sweep(
-    run_name="inflow_sweep",
+    run_name="inflow_sweep_ref",
     U_min=4,
     U_max=25,
     n=10
