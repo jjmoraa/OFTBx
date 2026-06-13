@@ -2,7 +2,7 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from OFTBx.turbine import Turbine
 
-cases_dir = Path("runs/inflow_sweep_mom")
+cases_dir = Path("runs/IEC_1_3_mom")
 case_dirs = sorted([
     d for d in cases_dir.iterdir()
     if d.is_dir() and (d / "case.fst").exists()
